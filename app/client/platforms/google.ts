@@ -144,6 +144,9 @@ export class GeminiProApi implements LLMApi {
     };
     const requestPayload = {
       contents: messages,
+      tools: [{
+      "googleSearch": {}
+    }],
       generationConfig: {
         // stopSequences: [
         //   "Title"
@@ -171,7 +174,7 @@ export class GeminiProApi implements LLMApi {
           threshold: accessStore.googleSafetySettings,
         },
       ],
-      tools: [{"googleSearch":{}}],
+
     };
 
     let shouldStream = !!options.config.stream;
