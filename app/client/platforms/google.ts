@@ -144,7 +144,15 @@ export class GeminiProApi implements LLMApi {
     };
     const requestPayload = {
       contents: messages,
-      tools: "1111",
+      generationConfig: {
+        // stopSequences: [
+        //   "Title"
+        // ],
+        temperature: modelConfig.temperature,
+        maxOutputTokens: modelConfig.max_tokens,
+        topP: modelConfig.top_p,
+        // "topK": modelConfig.top_k,
+      },
 
     };
 
