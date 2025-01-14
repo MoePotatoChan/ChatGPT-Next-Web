@@ -144,9 +144,6 @@ export class GeminiProApi implements LLMApi {
     };
     const requestPayload = {
       contents: messages,
-      tools: {
-      "googleSearch": {}
-    },
       generationConfig: {
         // stopSequences: [
         //   "Title"
@@ -156,7 +153,7 @@ export class GeminiProApi implements LLMApi {
         topP: modelConfig.top_p,
         // "topK": modelConfig.top_k,
       },
-
+      tools: {}
     };
 
     let shouldStream = !!options.config.stream;
