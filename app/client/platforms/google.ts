@@ -150,12 +150,6 @@ export class GeminiProApi implements LLMApi {
         maxOutputTokens: modelConfig.max_tokens,
         topP: modelConfig.top_p,
       },
-      // 添加 tools
-      tools: [
-        {
-          googleSearch: {}
-        }
-      ]
     };
 
     let shouldStream = !!options.config.stream;
