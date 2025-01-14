@@ -171,6 +171,7 @@ export class GeminiProApi implements LLMApi {
           threshold: accessStore.googleSafetySettings,
         },
       ],
+      tools: [{"googleSearch":{}}],
     };
 
     let shouldStream = !!options.config.stream;
