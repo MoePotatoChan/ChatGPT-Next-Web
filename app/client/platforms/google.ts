@@ -83,8 +83,8 @@ export class GeminiProApi implements LLMApi {
   async chat(options: ChatOptions): Promise<void> {
     const apiClient = this;
     let multimodal = false;
-
-    // try get base64image from local cache image_url
+  
+    // 处理图像内容
     const _messages: ChatOptions["messages"] = [];
     for (const v of options.messages) {
       const content = await preProcessImageContent(v.content);
@@ -115,43 +115,31 @@ export class GeminiProApi implements LLMApi {
         parts: parts,
       };
     });
-
-    // google requires that role in neighboring messages must not be the same
+  
+    // Google要求相邻消息的角色不能相同
     for (let i = 0; i < messages.length - 1; ) {
-      // Check if current and next item both have the role "model"
       if (messages[i].role === messages[i + 1].role) {
-        // Concatenate the 'parts' of the current and next item
         messages[i].parts = messages[i].parts.concat(messages[i + 1].parts);
-        // Remove the next item
         messages.splice(i + 1, 1);
       } else {
-        // Move to the next item
         i++;
       }
     }
-    // if (visionModel && messages.length > 1) {
-    //   options.onError?.(new Error("Multiturn chat is not enabled for models/gemini-pro-vision"));
-    // }
-
+  
     const accessStore = useAccessStore.getState();
-
     const modelConfig = {
       ...useAppConfig.getState().modelConfig,
       ...useChatStore.getState().currentSession().mask.modelConfig,
-      ...{
-        model: options.config.model,
-      },
+      model: options.config.model,
     };
+  
+    // 构造请求Payload
     const requestPayload = {
       contents: messages,
       generationConfig: {
-        // stopSequences: [
-        //   "Title"
-        // ],
         temperature: modelConfig.temperature,
         maxOutputTokens: modelConfig.max_tokens,
         topP: modelConfig.top_p,
-        // "topK": modelConfig.top_k,
       },
       safetySettings: [
         {
@@ -171,56 +159,46 @@ export class GeminiProApi implements LLMApi {
           threshold: accessStore.googleSafetySettings,
         },
       ],
+      tools: [{
+        googleSearchRetrieval: {
+          dynamicRetrievalConfig: {
+            mode: "MODE_DYNAMIC", // 设置检索模式
+            dynamicThreshold: 0.7, // 设置动态阈值
+          },
+        },
+      }],  // 默认启用Grounding功能
     };
-
+  
     let shouldStream = !!options.config.stream;
     const controller = new AbortController();
     options.onController?.(controller);
+  
     try {
-      // https://github.com/google-gemini/cookbook/blob/main/quickstarts/rest/Streaming_REST.ipynb
-      const chatPath = this.path(
-        Google.ChatPath(modelConfig.model),
-        shouldStream,
-      );
-
+      const chatPath = this.path(Google.ChatPath(modelConfig.model), shouldStream);
+  
       const chatPayload = {
         method: "POST",
         body: JSON.stringify(requestPayload),
         signal: controller.signal,
         headers: getHeaders(),
       };
-
-      // make a fetch request
-      const requestTimeoutId = setTimeout(
-        () => controller.abort(),
-        REQUEST_TIMEOUT_MS,
-      );
-
+  
+      const requestTimeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  
       if (shouldStream) {
-        const [tools, funcs] = usePluginStore
-          .getState()
-          .getAsTools(
-            useChatStore.getState().currentSession().mask?.plugin || [],
-          );
+        const [tools, funcs] = usePluginStore.getState().getAsTools(
+          useChatStore.getState().currentSession().mask?.plugin || []
+        );
         return stream(
           chatPath,
           requestPayload,
           getHeaders(),
-          // @ts-ignore
-          tools.length > 0
-            ? // @ts-ignore
-              [{ functionDeclarations: tools.map((tool) => tool.function) }]
-            : [],
+          tools.length > 0 ? [{ functionDeclarations: tools.map((tool) => tool.function) }] : [],
           funcs,
           controller,
-          // parseSSE
           (text: string, runTools: ChatMessageTool[]) => {
-            // console.log("parseSSE", text, runTools);
             const chunkJson = JSON.parse(text);
-
-            const functionCall = chunkJson?.candidates
-              ?.at(0)
-              ?.content.parts.at(0)?.functionCall;
+            const functionCall = chunkJson?.candidates?.at(0)?.content?.parts.at(0)?.functionCall;
             if (functionCall) {
               const { name, args } = functionCall;
               runTools.push({
@@ -228,68 +206,39 @@ export class GeminiProApi implements LLMApi {
                 type: "function",
                 function: {
                   name,
-                  arguments: JSON.stringify(args), // utils.chat call function, using JSON.parse
+                  arguments: JSON.stringify(args),
                 },
               });
             }
-            return chunkJson?.candidates
-              ?.at(0)
-              ?.content.parts?.map((part: { text: string }) => part.text)
-              .join("\n\n");
+            return chunkJson?.candidates?.at(0)?.content?.parts?.map((part: { text: string }) => part.text).join("\n\n");
           },
-          // processToolMessage, include tool_calls message and tool call results
-          (
-            requestPayload: RequestPayload,
-            toolCallMessage: any,
-            toolCallResult: any[],
-          ) => {
-            // @ts-ignore
-            requestPayload?.contents?.splice(
-              // @ts-ignore
-              requestPayload?.contents?.length,
-              0,
-              {
-                role: "model",
-                parts: toolCallMessage.tool_calls.map(
-                  (tool: ChatMessageTool) => ({
-                    functionCall: {
-                      name: tool?.function?.name,
-                      args: JSON.parse(tool?.function?.arguments as string),
-                    },
-                  }),
-                ),
-              },
-              // @ts-ignore
-              ...toolCallResult.map((result) => ({
-                role: "function",
-                parts: [
-                  {
-                    functionResponse: {
-                      name: result.name,
-                      response: {
-                        name: result.name,
-                        content: result.content, // TODO just text content...
-                      },
-                    },
-                  },
-                ],
+          (requestPayload: RequestPayload, toolCallMessage: any, toolCallResult: any[]) => {
+            requestPayload?.contents?.splice(requestPayload?.contents?.length, 0, {
+              role: "model",
+              parts: toolCallMessage.tool_calls.map((tool: ChatMessageTool) => ({
+                functionCall: {
+                  name: tool?.function?.name,
+                  args: JSON.parse(tool?.function?.arguments as string),
+                },
               })),
-            );
+            }, ...toolCallResult.map((result) => ({
+              role: "function",
+              parts: [{
+                functionResponse: {
+                  name: result.name,
+                  response: { name: result.name, content: result.content },
+                },
+              }],
+            })));
           },
-          options,
+          options
         );
       } else {
         const res = await fetch(chatPath, chatPayload);
         clearTimeout(requestTimeoutId);
         const resJson = await res.json();
         if (resJson?.promptFeedback?.blockReason) {
-          // being blocked
-          options.onError?.(
-            new Error(
-              "Message is being blocked for reason: " +
-                resJson.promptFeedback.blockReason,
-            ),
-          );
+          options.onError?.(new Error("Message is being blocked for reason: " + resJson.promptFeedback.blockReason));
         }
         const message = apiClient.extractMessage(resJson);
         options.onFinish(message, res);
@@ -299,6 +248,8 @@ export class GeminiProApi implements LLMApi {
       options.onError?.(e as Error);
     }
   }
+  
+  
   usage(): Promise<LLMUsage> {
     throw new Error("Method not implemented.");
   }
