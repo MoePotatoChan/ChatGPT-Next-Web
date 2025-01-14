@@ -144,7 +144,7 @@ export class GeminiProApi implements LLMApi {
     };
     const requestPayload = {
       contents: messages,
-      generationConfig: {
+      generationonfig: {
         // stopSequences: [
         //   "Title"
         // ],
