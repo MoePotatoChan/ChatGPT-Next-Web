@@ -129,9 +129,6 @@ export class GeminiProApi implements LLMApi {
         i++;
       }
     }
-    // if (visionModel && messages.length > 1) {
-    //   options.onError?.(new Error("Multiturn chat is not enabled for models/gemini-pro-vision"));
-    // }
 
     const accessStore = useAccessStore.getState();
 
@@ -142,9 +139,13 @@ export class GeminiProApi implements LLMApi {
         model: options.config.model,
       },
     };
-    // 修改 requestPayload 的构建
+
+    // 修改 requestPayload 的构建，添加 tools 参数
     const requestPayload = {
       contents: messages,
+      tools: [{
+        googleSearch: {}
+      }],
       generationConfig: {
         temperature: modelConfig.temperature,
         maxOutputTokens: modelConfig.max_tokens,
