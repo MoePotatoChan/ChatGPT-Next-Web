@@ -171,16 +171,6 @@ export class GeminiProApi implements LLMApi {
           threshold: accessStore.googleSafetySettings,
         },
       ],
-      tools: [
-        {
-          googleSearchRetrieval: {
-            dynamicRetrievalConfig: {
-              mode: "MODE_DYNAMIC",
-              dynamicThreshold: 0.7
-            }
-          }
-        }
-      ]
     };
 
     let shouldStream = !!options.config.stream;
