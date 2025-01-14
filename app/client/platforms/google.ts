@@ -142,6 +142,7 @@ export class GeminiProApi implements LLMApi {
         model: options.config.model,
       },
     };
+    // 修改 requestPayload 的构建
     const requestPayload = {
       contents: messages,
       generationConfig: {
@@ -149,11 +150,13 @@ export class GeminiProApi implements LLMApi {
         maxOutputTokens: modelConfig.max_tokens,
         topP: modelConfig.top_p,
       },
+      // 添加 tools
       tools: [
         {
           googleSearch: {}
         }
       ],
+      // 添加安全设置
       safetySettings: [
         {
           category: "HARM_CATEGORY_DANGEROUS_CONTENT",
@@ -177,12 +180,15 @@ export class GeminiProApi implements LLMApi {
     let shouldStream = !!options.config.stream;
     const controller = new AbortController();
     options.onController?.(controller);
+
     try {
-      // https://github.com/google-gemini/cookbook/blob/main/quickstarts/rest/Streaming_REST.ipynb
       const chatPath = this.path(
         Google.ChatPath(modelConfig.model),
         shouldStream,
       );
+
+      // 添加日志来调试请求数据
+      console.log("[Request Payload]", JSON.stringify(requestPayload, null, 2));
 
       const chatPayload = {
         method: "POST",
