@@ -153,7 +153,8 @@ export class GeminiProApi implements LLMApi {
         topP: modelConfig.top_p,
         // "topK": modelConfig.top_k,
       },
-
+      test: {testx:"test"},
+      
     };
 
     let shouldStream = !!options.config.stream;
